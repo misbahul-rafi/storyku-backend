@@ -7,9 +7,7 @@ const homeHandler = (req, res)=>{
     res.send("Halaman Home")
 }
 const storyHandler = async (req, res) => {
-    const {keyword} = req.query;
-    console.log(keyword)
-    let response;
+    const {keyword, category, status} = req.query;
     try {
         const allData = await getAllData(keyword);
         res.status(200).json(allData);
@@ -18,18 +16,43 @@ const storyHandler = async (req, res) => {
         res.status(500).send(`<h1>${error}</h1>`);
     }
 };
-const getAllData = async (keyword) => {
+const getAllData = async (keyword, category, status) => {
     try {
+        const whereClauses = [];
+
+        if (keyword) {
+            whereClauses.push('(title ILIKE $1 OR writer ILIKE $1)');
+        }
+        if (category) {
+            whereClauses.push('category ILIKE $2');
+        }
+        if (status) {
+            whereClauses.push('status ILIKE $3');
+        }
+        const whereCondition = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' OR ')}` : '';
         const query = `
-            SELECT * FROM stories WHERE title ILIKE $1 OR writer ILIKE $1;
+            SELECT * FROM stories
+            ${whereCondition};
         `;
-        const result = await pool.query(query, [`%${keyword}%`]);
+        const params = [];
+        if (keyword) params.push(`%${keyword}%`);
+        if (category) params.push(`%${category}%`);
+        if (status) params.push(`%${status}%`);
+        const result = await pool.query(query, params);
+        console.log('Generated Query:', query);
+        console.log('Query Parameters:', params);
+
         return result.rows;
     } catch (error) {
         console.error('Error executing query', error);
         throw error;
     }
 };
+
+
+
+
+
 
 const handleSingleStory = async (req, res) => {
     try {
