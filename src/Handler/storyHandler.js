@@ -7,24 +7,30 @@ const homeHandler = (req, res)=>{
     res.send("Halaman Home")
 }
 const storyHandler = async (req, res) => {
+    const {keyword} = req.query;
+    console.log(keyword)
     let response;
     try {
-        const allData = await getAllData();
+        const allData = await getAllData(keyword);
         res.status(200).json(allData);
     } catch (error) {
         console.error('Error fetching data', error);
         res.status(500).send(`<h1>${error}</h1>`);
     }
 };
-const getAllData = async () => {
+const getAllData = async (keyword) => {
     try {
-        const result = await pool.query('SELECT * FROM stories');
+        const query = `
+            SELECT * FROM stories WHERE title ILIKE $1 OR writer ILIKE $1;
+        `;
+        const result = await pool.query(query, [`%${keyword}%`]);
         return result.rows;
     } catch (error) {
         console.error('Error executing query', error);
         throw error;
     }
-}
+};
+
 const handleSingleStory = async (req, res) => {
     try {
         const storyId = req.params.storyId;
