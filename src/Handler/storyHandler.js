@@ -1,4 +1,4 @@
-const express = require('express')
+
 const pool = require('../database')
 const {nanoid} = require('nanoid')
 
@@ -7,7 +7,7 @@ const homeHandler = (req, res)=>{
     res.send("Halaman Home")
 }
 const storyHandler = async (req, res) => {
-    const {keyword, category, status} = req.query;
+    const {keyword} = req.query;
     try {
         const allData = await getAllData(keyword);
         res.status(200).json(allData);
@@ -16,43 +16,27 @@ const storyHandler = async (req, res) => {
         res.status(500).send(`<h1>${error}</h1>`);
     }
 };
-const getAllData = async (keyword, category, status) => {
+const getAllData = async (keyword) => {
     try {
         const whereClauses = [];
+        const params = [];
 
         if (keyword) {
             whereClauses.push('(title ILIKE $1 OR writer ILIKE $1)');
-        }
-        if (category) {
-            whereClauses.push('category ILIKE $2');
-        }
-        if (status) {
-            whereClauses.push('status ILIKE $3');
+            params.push(`%${keyword}%`);
         }
         const whereCondition = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' OR ')}` : '';
         const query = `
             SELECT * FROM stories
             ${whereCondition};
         `;
-        const params = [];
-        if (keyword) params.push(`%${keyword}%`);
-        if (category) params.push(`%${category}%`);
-        if (status) params.push(`%${status}%`);
         const result = await pool.query(query, params);
-        console.log('Generated Query:', query);
-        console.log('Query Parameters:', params);
-
         return result.rows;
     } catch (error) {
         console.error('Error executing query', error);
         throw error;
     }
 };
-
-
-
-
-
 
 const handleSingleStory = async (req, res) => {
     try {
@@ -156,9 +140,6 @@ const deleteStory = async (req, res) => {
         res.status(500).json({ message: 'Internal Server Error', details: error.message });
     }
 };
-
-
-  
 
 module.exports = {
     homeHandler,
