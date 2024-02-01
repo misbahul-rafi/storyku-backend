@@ -1,14 +1,16 @@
-drop table stories;
 drop table chapters;
+drop table stories;
 
 CREATE TABLE stories (
-  id varchar(50) primary key,
+  id VARCHAR(50) PRIMARY KEY,
   title VARCHAR(255) NOT NULL,
-  writer VARCHAR(255) not null,
-  category VARCHAR(50) not null,
-  tags text[],
+  writer VARCHAR(255) NOT NULL,
+  category VARCHAR(50) NOT NULL,
+  tags TEXT[],
   status VARCHAR,
-  synopsis TEXT
+  synopsis TEXT,
+  image VARCHAR(255),
+  total_chapters INT DEFAULT 0
 );
 
 CREATE TABLE chapters (
@@ -19,6 +21,23 @@ CREATE TABLE chapters (
   file VARCHAR(255),
   FOREIGN KEY (story_id) REFERENCES stories(id)
 );
+
+CREATE OR REPLACE FUNCTION update_total_chapters()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF TG_OP = 'INSERT' THEN
+    UPDATE stories SET total_chapters = total_chapters + 1 WHERE id = NEW.story_id;
+  ELSIF TG_OP = 'DELETE' THEN
+    UPDATE stories SET total_chapters = total_chapters - 1 WHERE id = OLD.story_id;
+  END IF;
+  RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER chapters_after_insert
+AFTER INSERT OR DELETE ON chapters
+FOR EACH ROW
+EXECUTE FUNCTION update_total_chapters();
 
 SELECT
   stories.id AS story_id,

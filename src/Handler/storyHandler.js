@@ -2,7 +2,117 @@
 const pool = require('../database')
 const {nanoid} = require('nanoid')
 
+const { ref, uploadBytes, getDownloadURL } = require("firebase/storage");
+const { storage } = require ('../../firebase');
 
+const addData = async (req, res) => {
+    const { title, writer, category, tags, status, synopsis } = req.body;
+    const image = req.file;
+    let tagsArray;
+    let uploadedImageUrl;
+
+    try {
+        if (title === '' || writer === '') {
+            const response = {
+                'status' : 400,
+                'messege': "Masukkan title dan writer"
+            }
+            return res.status(400).send(response)
+        }
+        if (tags) {
+            tagsArray = tags.split('#').filter(tag => tag.trim() !== '');
+        }
+        if(image){
+            console.log("Upload Image")
+            uploadedImageUrl = await uploadImage(title, image);
+        }
+        const data = {
+            'title': title,
+            'writer': writer,
+            'synopsis': synopsis,
+            'tags': tagsArray,
+            'category': category,
+            'status': status,
+            'image': uploadedImageUrl,
+        };
+
+        const response = {
+            'message': "Data Berhasil Di Upload",
+            'data': data,
+        };
+        console.log(response);
+
+        const result = await addToDatabase(data)
+        return res.status(201).send(response);
+    } catch (error) {
+        console.error("Error handling request: ", error);
+        const response = {
+            'message': 'Upload Failed',
+            'error': error.message,
+        };
+        res.status(500).send(response);
+    }
+};
+const uploadImage = async (title, image) => {
+    const timeStamp = new Date().getTime();
+    let downloadUrl;
+    try {
+        const ext = image.originalname.split('.').pop();
+        const imageName = `${title}-${timeStamp}.${ext}`;
+        const storageRef = ref(storage, `images/${imageName}`);
+        await uploadBytes(storageRef, image.buffer, {
+            contentType: image.mimetype,
+        }).then((snapshot) => {
+            console.log("Uploaded a Blob or File");
+        });
+        downloadUrl = await getDownloadURL(storageRef);
+        return downloadUrl;
+    } catch (error) {
+        console.error("Error uploading image: ", error);
+        return error
+    }
+}
+
+const addToDatabase = async (data) => {
+    const id = nanoid(5)
+    const query = `
+    INSERT INTO stories (id, title, writer, category, status, tags,  synopsis, image)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+    RETURNING *;
+    `;
+    const values = [
+        id,
+        data.title,
+        data.writer,
+        data.category,
+        data.status,
+        data.tags,
+        data.synopsis,
+        data.image
+    ]
+    const result = await pool.query(query, values)
+    return result
+}
+
+// const addData = async (req, res) => {
+//     try {
+//       const { title, writer, category, tags, status, synopsis, image } = req.body;
+//       console.log(image);
+//       const query = `
+//         INSERT INTO stories (id, title, writer, category, tags, status, synopsis)
+//         VALUES ($1, $2, $3, $4, $5, $6, $7)
+//         RETURNING *;
+//       `;
+//       const storyId = nanoid(12);
+//       const values = [storyId, title, writer, category, tags, status, synopsis]; 
+//       const result = await pool.query(query, values);
+  
+//       res.json(result.rows[0]);
+//     } catch (error) {
+//       console.error('Error adding story', error);
+//       res.status(500).json({ error: 'Internal Server Error', details: error.message });
+//     }
+//   };
 const homeHandler = (req, res)=>{
     res.send("Halaman Home")
 }
@@ -67,24 +177,7 @@ const getSingleStory = async (storyId) => {
         throw error;
     }
 };
-const addData = async (req, res) => {
-    try {
-      const { title, writer, category, tags, status, synopsis } = req.body;
-      const query = `
-        INSERT INTO stories (id, title, writer, category, tags, status, synopsis)
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
-        RETURNING *;
-      `;
-      const storyId = nanoid(12);
-      const values = [storyId, title, writer, category, tags, status, synopsis]; 
-      const result = await pool.query(query, values);
-  
-      res.json(result.rows[0]);
-    } catch (error) {
-      console.error('Error adding story', error);
-      res.status(500).json({ error: 'Internal Server Error', details: error.message });
-    }
-  };
+
   
 
 const editStoryWithId = async (req, res) => {
